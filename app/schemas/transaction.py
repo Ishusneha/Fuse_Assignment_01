@@ -1,29 +1,29 @@
-from pydantic import BaseModel, condecimal
-from typing import Optional
-from datetime import datetime
 from enum import Enum
+from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
 from app.schemas.category import Category
 
 class TransactionType(str, Enum):
-    INCOME = "income"
-    EXPENSE = "expense"
+    income = "income"
+    expense = "expense"
 
 class TransactionBase(BaseModel):
-    amount: condecimal(max_digits=10, decimal_places=2)
+    amount: float
     type: TransactionType
     description: str
-    currency: str = "USD"
     category_id: int
+    currency: str = "USD"
 
 class TransactionCreate(TransactionBase):
     pass
 
 class TransactionUpdate(TransactionBase):
-    amount: Optional[condecimal(max_digits=10, decimal_places=2)] = None
+    amount: Optional[float] = None
     type: Optional[TransactionType] = None
     description: Optional[str] = None
-    currency: Optional[str] = None
     category_id: Optional[int] = None
+    currency: Optional[str] = None
 
 class Transaction(TransactionBase):
     id: int

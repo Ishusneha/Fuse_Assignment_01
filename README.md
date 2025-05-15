@@ -1,49 +1,35 @@
 # Finance Tracker API
 
-A FastAPI-based personal finance tracking application that follows 12-Factor app principles.
+A FastAPI-based microservice for tracking personal finances, implementing 12-Factor app principles.
 
 ## Features
 
-- User authentication and authorization
-- Transaction management (create, read, update, delete)
-- Category management for transactions
-- Support for multiple currencies
-- Secure password hashing and JWT authentication
+- User authentication with JWT tokens
+- Transaction management (income/expenses)
+- Category management
+- Financial summaries and reports
+- SQLite database (configurable for PostgreSQL)
+- Docker containerization
+- Comprehensive test suite
 
-## 12-Factor App Principles Implementation
+## Prerequisites
 
-1. **Codebase**: One codebase tracked in Git
-2. **Dependencies**: Explicitly declared in requirements.txt
-3. **Config**: Environment variables for all configuration
-4. **Backing Services**: Database treated as attached resource
-5. **Build, Release, Run**: Clearly separated stages in Dockerfile
-6. **Processes**: Stateless application design
-7. **Port Binding**: Self-contained with port configuration
-8. **Concurrency**: Horizontally scalable
-9. **Disposability**: Fast startup and graceful shutdown
-10. **Dev/Prod Parity**: Docker ensures consistency
-11. **Logs**: Structured logging to stdout
-12. **Admin Processes**: Separate scripts for admin tasks
+- Python 3.8+
+- Docker and Docker Compose
+- Git
 
-## Getting Started
-
-### Prerequisites
-
-- Python 3.9+
-- Docker and Docker Compose (optional)
-
-### Local Development
+## Local Development Setup
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone <your-repo-url>
 cd finance-tracker
 ```
 
 2. Create and activate a virtual environment:
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
 ```
 
 3. Install dependencies:
@@ -51,10 +37,10 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Create a .env file:
+4. Set up environment variables:
 ```bash
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your settings
 ```
 
 5. Run the application:
@@ -62,27 +48,84 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-### Using Docker
+The API will be available at http://localhost:8000
+- API Documentation: http://localhost:8000/docs
+- Alternative Documentation: http://localhost:8000/redoc
 
-1. Build and run with Docker Compose:
+## Docker Setup
+
+1. Build and run using Docker Compose:
 ```bash
 docker-compose up --build
 ```
 
 The API will be available at http://localhost:8000
 
-### API Documentation
+## Environment Variables
 
-Once the application is running, you can access:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+| Variable | Description | Default |
+|----------|-------------|---------|
+| DATABASE_URL | Database connection string | sqlite:///./finance_tracker.db |
+| SECRET_KEY | JWT secret key | your-secret-key-here |
+| ACCESS_TOKEN_EXPIRE_MINUTES | Token expiration time | 30 |
+| EXCHANGE_RATE_API_KEY | API key for currency conversion | None |
+
+## Project Structure
+
+```
+finance-tracker/
+├── app/
+│   ├── api/
+│   │   └── endpoints/
+│   ├── core/
+│   ├── db/
+│   ├── models/
+│   └── schemas/
+├── tests/
+├── docker/
+├── .env
+├── docker-compose.yml
+├── Dockerfile
+└── requirements.txt
+```
 
 ## Testing
 
-Run tests with pytest:
+Run tests using pytest:
 ```bash
 pytest
 ```
+
+For test coverage:
+```bash
+pytest --cov=app tests/
+```
+
+## API Endpoints
+
+### Authentication
+- POST `/auth/register` - Register new user
+- POST `/auth/token` - Login and get access token
+
+### Transactions
+- GET `/api/v1/transactions/` - List transactions
+- POST `/api/v1/transactions/` - Create transaction
+- GET `/api/v1/transactions/{id}` - Get transaction details
+- PUT `/api/v1/transactions/{id}` - Update transaction
+- DELETE `/api/v1/transactions/{id}` - Delete transaction
+
+### Categories
+- GET `/api/v1/categories/` - List categories
+- POST `/api/v1/categories/` - Create category
+- GET `/api/v1/categories/{id}` - Get category details
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 

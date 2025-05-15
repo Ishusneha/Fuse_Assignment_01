@@ -1,7 +1,7 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, Security
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
@@ -27,7 +27,9 @@ def read_transactions(
     """
     transactions = (
         db.query(Transaction)
+        .options(joinedload(Transaction.category))
         .filter(Transaction.user_id == current_user.id)
+        .order_by(Transaction.date.desc())
         .offset(skip)
         .limit(limit)
         .all()
@@ -57,6 +59,14 @@ def create_transaction(
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
+    
+    # Reload the transaction with category
+    transaction = (
+        db.query(Transaction)
+        .options(joinedload(Transaction.category))
+        .filter(Transaction.id == transaction.id)
+        .first()
+    )
     return transaction
 
 @router.put("/{transaction_id}", response_model=TransactionSchema, summary="Update transaction")
@@ -79,6 +89,7 @@ def update_transaction(
     """
     transaction = (
         db.query(Transaction)
+        .options(joinedload(Transaction.category))
         .filter(Transaction.id == transaction_id, Transaction.user_id == current_user.id)
         .first()
     )
@@ -91,6 +102,14 @@ def update_transaction(
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
+    
+    # Reload the transaction with category
+    transaction = (
+        db.query(Transaction)
+        .options(joinedload(Transaction.category))
+        .filter(Transaction.id == transaction.id)
+        .first()
+    )
     return transaction
 
 @router.delete("/{transaction_id}", summary="Delete transaction")

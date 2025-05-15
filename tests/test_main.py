@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 import pytest
 from datetime import datetime
-from decimal import Decimal
 import uuid
 from typing import Generator
 
@@ -20,7 +19,7 @@ from app.core.config import settings
 from app.models.category import Category
 from app.models.transaction import Transaction
 from app.models.user import User
-from app.core.security import get_password_hash, verify_password
+from app.core.security import get_password_hash
 from app.db.session import get_db
 from app.schemas.user import UserCreate
 
@@ -29,37 +28,31 @@ SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False},
-    poolclass=StaticPool  # This ensures single connection
+    poolclass=StaticPool
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Create all tables for each test
+@pytest.fixture(autouse=True)
+def setup_db():
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
 
 def override_get_db():
-    """Override the database dependency."""
-    db = TestingSessionLocal()
     try:
+        db = TestingSessionLocal()
         yield db
     finally:
         db.close()
 
-# Override the database dependency
 app.dependency_overrides[get_db] = override_get_db
 
 # Test client
 client = TestClient(app)
 
-@pytest.fixture(autouse=True)
-def setup_db():
-    """Setup fresh database for each test."""
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
 @pytest.fixture
 def db() -> Generator[Session, None, None]:
-    """Get database session for tests."""
     db = TestingSessionLocal()
     try:
         yield db
@@ -67,28 +60,22 @@ def db() -> Generator[Session, None, None]:
         db.close()
 
 @pytest.fixture
-def test_user(db: Session) -> dict:
+def test_user() -> dict:
     """Create a test user and return user data with password."""
     email = f"test_{uuid.uuid4()}@example.com"
     password = "testpass123"
     
-    # Create user through the API endpoint
-    user_data = {
-        "email": email,
-        "password": password,
-        "full_name": "Test User"
-    }
+    user_in = UserCreate(
+        email=email,
+        password=password,
+        full_name="Test User"
+    )
     
-    response = client.post("/auth/register", json=user_data)
+    response = client.post("/auth/register", json=user_in.dict())
     assert response.status_code == 200, f"Registration failed: {response.text}"
     
-    # Get the created user from database
-    user = db.query(User).filter(User.email == email).first()
-    assert user is not None, "User was not created in database"
-    assert verify_password(password, user.hashed_password), "Password verification failed"
-    
     return {
-        "user": user,
+        "user": response.json(),
         "email": email,
         "password": password
     }
@@ -96,17 +83,15 @@ def test_user(db: Session) -> dict:
 @pytest.fixture
 def auth_headers(test_user) -> dict:
     """Get authentication headers for a test user."""
-    # Create form data
     form_data = {
         "username": test_user["email"],
         "password": test_user["password"],
         "grant_type": "password"
     }
     
-    # Send as form data
     response = client.post(
         "/auth/token",
-        data=form_data,  # Use data instead of json for form data
+        data=form_data,
         headers={"Content-Type": "application/x-www-form-urlencoded"}
     )
     
@@ -118,7 +103,7 @@ def auth_headers(test_user) -> dict:
 def test_category(db: Session) -> Category:
     """Create a test category."""
     category = Category(
-        name="Test Category",
+        name=f"Test Category {uuid.uuid4()}",
         description="Test category description"
     )
     db.add(category)
@@ -136,40 +121,35 @@ def test_read_main():
         "redoc": "/redoc"
     }
 
-def test_user_registration(db: Session):
+def test_user_registration():
     """Test user registration process."""
     email = f"new_user_{uuid.uuid4()}@example.com"
     password = "testpass123"
     
-    user_data = {
-        "email": email,
-        "password": password,
-        "full_name": "New Test User"
-    }
+    user_in = UserCreate(
+        email=email,
+        password=password,
+        full_name="New Test User"
+    )
     
-    response = client.post("/auth/register", json=user_data)
+    response = client.post("/auth/register", json=user_in.dict())
     assert response.status_code == 200, f"Registration failed: {response.text}"
-    assert "id" in response.json()
-    
-    # Verify user exists in database
-    user = db.query(User).filter(User.email == email).first()
-    assert user is not None, "User was not created in database"
-    assert user.full_name == user_data["full_name"]
-    assert verify_password(password, user.hashed_password)
+    data = response.json()
+    assert "id" in data
+    assert data["email"] == email
+    assert data["full_name"] == user_in.full_name
 
 def test_user_login(test_user):
     """Test user login process."""
-    # Create form data
     form_data = {
         "username": test_user["email"],
         "password": test_user["password"],
         "grant_type": "password"
     }
     
-    # Send as form data
     response = client.post(
         "/auth/token",
-        data=form_data,  # Use data instead of json for form data
+        data=form_data,
         headers={"Content-Type": "application/x-www-form-urlencoded"}
     )
     
@@ -199,6 +179,7 @@ def test_create_transaction(db: Session, test_user, auth_headers, test_category)
     assert float(data["amount"]) == transaction_data["amount"]
     assert data["type"] == transaction_data["type"]
     assert data["description"] == transaction_data["description"]
+    assert data["user_id"] == test_user["user"]["id"]
 
 def test_read_transactions(auth_headers):
     """Test reading transactions list."""
@@ -214,14 +195,30 @@ def test_read_categories(auth_headers):
 
 def test_transaction_summary(db: Session, test_user, auth_headers, test_category):
     """Test transaction calculations."""
-    # Create test transactions
     transactions = [
-        {"amount": 1000.00, "type": "income", "description": "Salary", "category_id": test_category.id, "currency": "USD"},
-        {"amount": 500.00, "type": "expense", "description": "Rent", "category_id": test_category.id, "currency": "USD"},
-        {"amount": 200.00, "type": "expense", "description": "Groceries", "category_id": test_category.id, "currency": "USD"}
+        {
+            "amount": 1000.00,
+            "type": "income",
+            "description": "Salary",
+            "category_id": test_category.id,
+            "currency": "USD"
+        },
+        {
+            "amount": 500.00,
+            "type": "expense",
+            "description": "Rent",
+            "category_id": test_category.id,
+            "currency": "USD"
+        },
+        {
+            "amount": 200.00,
+            "type": "expense",
+            "description": "Groceries",
+            "category_id": test_category.id,
+            "currency": "USD"
+        }
     ]
     
-    # Add transactions through API
     for transaction_data in transactions:
         response = client.post(
             "/api/v1/transactions/",
@@ -230,11 +227,9 @@ def test_transaction_summary(db: Session, test_user, auth_headers, test_category
         )
         assert response.status_code == 200, f"Failed to create transaction: {response.text}"
     
-    # Get all transactions
     response = client.get("/api/v1/transactions/", headers=auth_headers)
     assert response.status_code == 200, f"Failed to read transactions: {response.text}"
     
-    # Calculate totals
     transactions = response.json()
     total_income = sum(float(t["amount"]) for t in transactions if t["type"] == "income")
     total_expenses = sum(float(t["amount"]) for t in transactions if t["type"] == "expense")

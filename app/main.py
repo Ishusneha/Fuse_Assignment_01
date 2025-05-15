@@ -11,14 +11,6 @@ from app.db.init_db import init_db
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
-# Initialize database with default data
-try:
-    db = SessionLocal()
-    init_db(db)
-    db.close()
-except Exception as e:
-    print(f"Error initializing database: {e}")
-
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
@@ -30,10 +22,10 @@ app = FastAPI(
 # Security scheme for Swagger UI
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
-# Set all CORS enabled origins
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],  # React frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,20 +40,30 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # Include routers
-app.include_router(auth.router, prefix="/auth", tags=["authentication"])
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(
     transactions.router,
     prefix=f"{settings.API_V1_STR}/transactions",
-    tags=["transactions"]
+    tags=["transactions"],
 )
 app.include_router(
     categories.router,
     prefix=f"{settings.API_V1_STR}/categories",
-    tags=["categories"]
+    tags=["categories"],
 )
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database with default data on startup."""
+    db = SessionLocal()
+    try:
+        init_db(db)
+    finally:
+        db.close()
 
 @app.get("/")
 def read_root():
+    """Root endpoint."""
     return {
         "message": "Welcome to Finance Tracker API",
         "docs": "/docs",

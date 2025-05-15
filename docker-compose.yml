@@ -1,21 +1,39 @@
+version: '3.8'
+
 services:
   api:
     build: .
     ports:
       - "8000:8000"
-    volumes:
-      - .:/app
     environment:
-      - DATABASE_URL=sqlite:///./finance_tracker.db
-      - SECRET_KEY=development-secret-key
-      - ALGORITHM=HS256
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/finance_tracker
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - EXCHANGE_RATE_API_KEY=${EXCHANGE_RATE_API_KEY}
+    depends_on:
+      - db
+    volumes:
+      - ./app:/app/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=finance_tracker
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:
 
   frontend:
     build: 

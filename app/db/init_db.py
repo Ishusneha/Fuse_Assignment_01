@@ -1,21 +1,24 @@
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import Category
+from app.models.category import Category
 
 def init_db(db: Session) -> None:
-    # Create default categories
+    """Initialize the database with default data."""
+    # Create default categories if they don't exist
     default_categories = [
-        {"name": "Groceries", "description": "Food and household items"},
-        {"name": "Transportation", "description": "Public transport, fuel, etc."},
-        {"name": "Utilities", "description": "Electricity, water, internet, etc."},
-        {"name": "Entertainment", "description": "Movies, games, dining out"},
-        {"name": "Salary", "description": "Regular income"},
-        {"name": "Investment", "description": "Returns from investments"},
-        {"name": "Shopping", "description": "Clothing, electronics, etc."},
-        {"name": "Healthcare", "description": "Medical expenses, medicines"},
-        {"name": "Education", "description": "Books, courses, tuition"},
-        {"name": "Other", "description": "Miscellaneous expenses"}
+        {"name": "Food & Dining", "description": "Restaurants, groceries, and food delivery"},
+        {"name": "Shopping", "description": "Retail purchases and online shopping"},
+        {"name": "Transportation", "description": "Gas, public transit, and ride sharing"},
+        {"name": "Bills & Utilities", "description": "Electricity, water, internet, and phone"},
+        {"name": "Entertainment", "description": "Movies, games, and hobbies"},
+        {"name": "Health", "description": "Medical expenses and healthcare"},
+        {"name": "Travel", "description": "Flights, hotels, and vacations"},
+        {"name": "Education", "description": "Tuition, books, and courses"},
+        {"name": "Salary", "description": "Regular employment income"},
+        {"name": "Investments", "description": "Investment returns and dividends"},
+        {"name": "Gifts", "description": "Received gifts and bonuses"},
+        {"name": "Other Income", "description": "Miscellaneous income sources"},
     ]
 
     for category_data in default_categories:
@@ -24,8 +27,4 @@ def init_db(db: Session) -> None:
             category = Category(**category_data)
             db.add(category)
     
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise e 
+    db.commit() 
